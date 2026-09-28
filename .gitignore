@@ -9,3 +9,6 @@ venv/
 
 # Mac junk
 .DS_Store
+
+# Scratch files
+scratch.py
