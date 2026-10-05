@@ -18,9 +18,18 @@ def dataset_meta_features(df, target_col="target"):
     off_diagonal = corr_matrix[~np.eye(n, dtype=bool)]
     mean_feature_correlation = np.nanmean(np.abs(off_diagonal)) if n > 1 else 0.0
 
+    # NEW: strongest link between any two feature columns (a copied column shows up here).
+    max_pairwise_correlation = np.nanmax(np.abs(off_diagonal)) if n > 1 else 0.0
+
+    # NEW: share of column pairs that are near-copies of each other.
+    frac_near_duplicate_pairs = np.nanmean(np.abs(off_diagonal) > 0.95) if n > 1 else 0.0
+
     # Highest correlation between any single feature and the target.
     target_corrs = X.corrwith(y).abs()
     max_feature_target_correlation = target_corrs.max() if len(target_corrs) > 0 else 0.0
+
+    # NEW: average strength of the link between features and the target.
+    mean_feature_target_correlation = target_corrs.mean() if len(target_corrs) > 0 else 0.0
 
     # Fraction of cells more than 3 standard deviations from their column's mean.
     z_scores = (X - X.mean()) / X.std()
@@ -31,6 +40,9 @@ def dataset_meta_features(df, target_col="target"):
         "missing_rate": round(float(missing_rate), 4),
         "mean_feature_correlation": round(float(mean_feature_correlation), 4),
         "max_feature_target_correlation": round(float(max_feature_target_correlation), 4),
+        "max_pairwise_correlation": round(float(max_pairwise_correlation), 4),
+        "frac_near_duplicate_pairs": round(float(frac_near_duplicate_pairs), 4),
+        "mean_feature_target_correlation": round(float(mean_feature_target_correlation), 4),
         "outlier_score": round(float(outlier_score), 4),
         "n_rows": len(df),
         "n_features": len(feature_cols),

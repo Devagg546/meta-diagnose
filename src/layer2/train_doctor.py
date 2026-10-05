@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.dummy import DummyClassifier
+from sklearn.utils.class_weight import compute_sample_weight
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
 from sklearn.model_selection import LeaveOneGroupOut
@@ -15,9 +16,11 @@ RESULTS_DIR = Path("results")
 
 FEATURE_COLS = [
     "minority_class_share", "missing_rate", "mean_feature_correlation",
-    "max_feature_target_correlation", "outlier_score", "n_rows", "n_features",
-    "accuracy", "macro_f1", "minority_recall", "train_test_gap",
-    "error_rate_class_0", "error_rate_class_1", "mean_confidence_on_errors",
+    "max_feature_target_correlation", "max_pairwise_correlation",
+    "frac_near_duplicate_pairs", "mean_feature_target_correlation",
+    "outlier_score", "accuracy", "macro_f1", "minority_recall",
+    "train_test_gap", "error_rate_class_0", "error_rate_class_1",
+    "mean_confidence_on_errors",
 ]
 LABEL_COL = "true_flaw"
 GROUP_COL = "dataset"
@@ -70,7 +73,8 @@ def main():
         preds = {"rules": encoder.transform(rule_based_diagnosis(X_test))}
         for name, make_model in models.items():
             model = make_model()
-            model.fit(X_train, y_train)
+            weights = compute_sample_weight("balanced", y_train)
+            model.fit(X_train, y_train, sample_weight=weights)
             preds[name] = model.predict(X_test)
 
         for name, y_pred in preds.items():
