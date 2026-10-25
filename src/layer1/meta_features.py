@@ -90,3 +90,62 @@ def error_meta_features(y_test_true, y_test_pred, y_test_proba):
         "error_rate_class_1": round(float(error_rates.get(1, 0.0)), 4),
         "mean_confidence_on_errors": round(float(confidence_on_wrong_predictions), 4),
     }
+
+def probe_meta_features(df, target_col="target", max_rows=2000, random_state=0):
+    """Symptoms found by PROBING the data: small experiments run on the dataset itself."""
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
+
+    feature_cols = [c for c in df.columns if c != target_col]
+    X = df[feature_cols].copy()
+    y = pd.factorize(df[target_col], sort=True)[0]
+
+    # Models cannot read NaN, so fill gaps with the column average (all-empty columns become 0).
+    X = X.fillna(X.mean(numeric_only=True)).fillna(0.0)
+
+    # Keep the probe fast on big datasets.
+    if len(X) > max_rows:
+        X, _, y, _ = train_test_split(X, y, train_size=max_rows, stratify=y, random_state=random_state)
+
+    X_arr = X.to_numpy(dtype=float)
+
+    # ---- Probe 1: out-of-fold predictions, to see how well each row's label is "believed" ----
+    n_splits = int(min(5, np.bincount(y).min()))
+    if n_splits >= 2:
+        rf = RandomForestClassifier(n_estimators=60, random_state=random_state, n_jobs=-1)
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
+        proba = cross_val_predict(rf, X_arr, y, cv=cv, method="predict_proba")
+        given_label_prob = proba[np.arange(len(y)), y]
+        confident_disagreement_rate = float((given_label_prob < 0.1).mean())
+        mean_given_label_prob = float(given_label_prob.mean())
+    else:
+        confident_disagreement_rate, mean_given_label_prob = 0.0, 1.0
+
+    # ---- Probe 2: does one single feature dominate the model? ----
+    rf_full = RandomForestClassifier(n_estimators=60, random_state=random_state, n_jobs=-1).fit(X_arr, y)
+    top_feature_importance_share = float(rf_full.feature_importances_.max())
+
+    # ---- Probe 3: shape of each column (robust spread vs normal spread, extreme values) ----
+    std = X_arr.std(axis=0)
+    ok = std > 1e-12
+    if ok.any():
+        Xo = X_arr[:, ok]
+        med = np.median(Xo, axis=0)
+        mad = np.median(np.abs(Xo - med), axis=0) * 1.4826
+        has_spread = mad > 1e-12   # skip mostly-constant columns (e.g. mostly zeros)
+        if has_spread.any():
+            robust_spread_ratio = float(np.median(mad[has_spread] / Xo.std(axis=0)[has_spread]))
+        else:
+            robust_spread_ratio = 1.0
+        rz = np.abs(Xo - med) / np.where(mad > 1e-12, mad, np.nan)
+        robust_outlier_share = float(np.nanmean(rz > 6)) if np.isfinite(rz).any() else 0.0
+    else:
+        robust_spread_ratio, robust_outlier_share = 1.0, 0.0
+
+    return {
+        "confident_disagreement_rate": round(confident_disagreement_rate, 4),
+        "mean_given_label_prob": round(mean_given_label_prob, 4),
+        "top_feature_importance_share": round(top_feature_importance_share, 4),
+        "robust_spread_ratio": round(robust_spread_ratio, 4),
+        "robust_outlier_share": round(robust_outlier_share, 4),
+    }

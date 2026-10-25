@@ -12,6 +12,7 @@ from src.layer1.meta_features import (
     dataset_meta_features,
     model_meta_features,
     error_meta_features,
+    probe_meta_features,
 )
 
 RAW_DIR = Path("data/raw")
@@ -27,6 +28,9 @@ MODELS = {
     "random_forest": RandomForestClassifier(n_estimators=100, random_state=0),
     "xgboost": XGBClassifier(eval_metric="logloss", random_state=0),
 }
+
+# The probe depends only on the (dataset, condition), not on the model, so compute it once and reuse.
+_PROBE_CACHE = {}
 
 
 def run_one(dataset_name, clean_df, condition, model_name, model, random_state):
@@ -56,6 +60,10 @@ def run_one(dataset_name, clean_df, condition, model_name, model, random_state):
         "model": model_name,
     }
     row.update(dataset_meta_features(flawed_df))
+    key = (dataset_name, condition["condition_id"])
+    if key not in _PROBE_CACHE:
+        _PROBE_CACHE[key] = probe_meta_features(flawed_df)
+    row.update(_PROBE_CACHE[key])
     row.update(model_meta_features(y_train, y_train_pred, y_test, y_test_pred))
     row.update(error_meta_features(y_test, y_test_pred, y_test_proba))
     return row

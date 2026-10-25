@@ -21,6 +21,8 @@ FEATURE_COLS = [
     "outlier_score", "accuracy", "macro_f1", "minority_recall",
     "train_test_gap", "error_rate_class_0", "error_rate_class_1",
     "mean_confidence_on_errors",
+    "confident_disagreement_rate", "mean_given_label_prob",
+    "top_feature_importance_share", "robust_spread_ratio", "robust_outlier_share",
 ]
 LABEL_COL = "true_flaw"
 GROUP_COL = "dataset"
