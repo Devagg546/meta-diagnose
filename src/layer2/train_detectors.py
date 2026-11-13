@@ -20,10 +20,31 @@ pd.set_option("display.width", 200)
 
 RESULTS_DIR = Path("results")
 META_FILE = RESULTS_DIR / "meta_dataset_v2.csv"
+EXTRA_FILE = RESULTS_DIR / "clean_extra_v2.csv"   # extra healthy slices (made by run_clean_extra)
 
 FLAWS = ["imbalance", "missing_values", "leakage", "feature_noise",
          "label_noise", "outliers", "redundancy"]
 THRESHOLD = 0.5      # a detector "fires" when its probability is at least this
+
+
+def load_meta():
+    """The main results, plus the extra healthy slices if they exist."""
+    df = pd.read_csv(META_FILE)
+    if EXTRA_FILE.exists():
+        df = pd.concat([df, pd.read_csv(EXTRA_FILE)], ignore_index=True)
+    return df
+
+
+def headline(df, truth, guess, mask):
+    """Accuracy and macro-F1, averaged over datasets, for the rows selected by mask."""
+    scores = []
+    for ds in df.loc[mask, GROUP_COL].unique():
+        m = mask & (df[GROUP_COL] == ds)
+        scores.append((accuracy_score(truth[m], guess[m]),
+                       f1_score(truth[m], guess[m], average="macro", zero_division=0)))
+    scores = np.array(scores)
+    return (f"accuracy {scores[:, 0].mean():.3f} +/- {scores[:, 0].std(ddof=1):.3f}   "
+            f"macro-F1 {scores[:, 1].mean():.3f} +/- {scores[:, 1].std(ddof=1):.3f}")
 
 
 def detector_probabilities(df):
@@ -69,9 +90,11 @@ def severity_levels(df):
 
 
 def main():
-    df = pd.read_csv(META_FILE)
+    df = load_meta()
     truth = df[LABEL_COL]
     is_clean = truth == "clean"
+    is_extra = df["slice"].astype(str).str.startswith("cleanx") if "slice" in df.columns else pd.Series(False, index=df.index)
+    original = ~is_extra
 
     probs = detector_probabilities(df)
     guess, fired = diagnose(probs, THRESHOLD)
@@ -81,21 +104,17 @@ def main():
         RESULTS_DIR / "detector_probabilities.csv", index=False)
 
     # ---- 1. headline, scored like the old Doctor (one answer per row) ----
-    scores = []
-    for ds in df[GROUP_COL].unique():
-        m = df[GROUP_COL] == ds
-        scores.append((accuracy_score(truth[m], guess[m]),
-                       f1_score(truth[m], guess[m], average="macro", zero_division=0)))
-    scores = np.array(scores)
     print("=== 1. Headline: strongest detector wins, 'clean' if none fired (mean +/- std over datasets) ===")
-    print(f"accuracy {scores[:, 0].mean():.3f} +/- {scores[:, 0].std(ddof=1):.3f}   "
-          f"macro-F1 {scores[:, 1].mean():.3f} +/- {scores[:, 1].std(ddof=1):.3f}")
+    print("original rows only (comparable with last time):", headline(df, truth, guess, original))
+    print("all rows, incl. extra healthy slices:          ", headline(df, truth, guess, original | is_extra))
     print("(the single multi-class Random Forest Doctor scored 0.757 accuracy / 0.666 macro-F1)")
 
     # ---- 2. can it finally say 'nothing found'? ----
     print("\n=== 2. Healthy data ===")
-    print(f"Clean rows where no detector fired: {(guess[is_clean] == 'clean').sum()} of {is_clean.sum()}")
-    print("Detectors that fired on clean rows:", fired[is_clean].sum().to_dict())
+    for label, m in [("original clean rows", is_clean & original), ("extra healthy slices", is_clean & is_extra)]:
+        if m.sum():
+            print(f"{label}: no detector fired on {(guess[m] == 'clean').sum()} of {m.sum()}")
+    print("Detectors that fired on healthy rows (all):", fired[is_clean].sum().to_dict())
     print(f"Rows where more than one detector fired: {(fired.sum(axis=1) > 1).mean():.0%}")
 
     # ---- 3. each detector on its own ----
@@ -134,7 +153,7 @@ def main():
             "flawed_rows_caught": own_detector_fired(f, truth).mean(),
             "accuracy_one_answer": accuracy_score(truth, g),
         })
-    print("\n=== 5. What the 'fire' threshold trades off ===")
+    print("\n=== 5. What the 'fire' threshold trades off (all rows; healthy rows are a bigger share now) ===")
     print(pd.DataFrame(rows).set_index("threshold").round(2).to_string())
 
 
