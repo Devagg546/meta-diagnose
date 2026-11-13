@@ -14,3 +14,5 @@ venv/
 scratch.py
 
 results/meta_dataset_v2_quick.csv
+
+data/natural/
