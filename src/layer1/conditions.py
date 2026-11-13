@@ -19,7 +19,7 @@ FLAW_FUNCTIONS = {
 }
 
 SEVERITY_LEVELS = {
-    "imbalance":      [{"minority_share": s}   for s in [0.3, 0.15, 0.1, 0.02]],
+    "imbalance":      [{"minority_share": s}   for s in [0.17, 0.1, 0.05, 0.02]],
     "missing_values": [{"missing_rate": s}     for s in [0.05, 0.15, 0.25, 0.4]],
     "leakage":        [{"leak_strength": s}    for s in [0.3, 0.6, 0.8, 0.95]],
     "feature_noise":  [{"noise_level": s}      for s in [0.05, 0.15, 0.3, 0.5]],

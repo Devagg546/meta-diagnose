@@ -20,8 +20,8 @@ def inject_imbalance(df, target_col="target", minority_share=0.1, random_state=N
     (flawed_df, info) where info is a dict describing what was done.
     """
     counts = df[target_col].value_counts()
-    minority_class = counts.idxmin()
-    majority_class = counts.idxmax()
+    majority_class = counts.index[0]    # value_counts() sorts largest first, so these are
+    minority_class = counts.index[-1]   # two different classes even when the counts are equal
 
     minority_rows = df[df[target_col] == minority_class]
     majority_rows = df[df[target_col] == majority_class]

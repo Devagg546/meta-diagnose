@@ -12,3 +12,5 @@ venv/
 
 # Scratch files
 scratch.py
+
+results/meta_dataset_v2_quick.csv

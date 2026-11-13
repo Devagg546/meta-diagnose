@@ -55,7 +55,7 @@ def make_models():
 
 
 def main():
-    df = pd.read_csv(RESULTS_DIR / "meta_dataset.csv")
+    df = pd.read_csv(RESULTS_DIR / "meta_dataset_v2.csv")
     X = df[FEATURE_COLS]
     groups = df[GROUP_COL]
 
